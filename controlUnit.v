@@ -1,0 +1,1166 @@
+module controlUnit(
+	// Control Signals
+	// Enables 
+	output reg IR_Enable, output reg PC_Enable, output reg NPC_Enable,
+	// Clear Signals
+	output reg  ClrPC, output reg ClrNPC,
+	// Control Signals
+	output reg Branch, output reg RegDst, output reg RegWrite, 
+	output reg MemRead, output reg [1:0] MemtoReg, output reg [4:0] ALUOp,
+	output reg MemWrite, output reg ALUSrc, 
+	output reg [1:0] MUX_A_Sel, output reg [1:0] MUX_B_Sel, 
+	output reg isSigned, output reg [2:0] signedCompare, output reg [2:0] unsignedCompare,
+	output reg isJump, output reg [1:0] ramType,
+	// Flags
+	input Zero, input Neg, input Carry, input Overflow, //añadir select Hi y Lo
+
+	//input
+	input [5:0] OpCode, input [5:0] functCode, input RESET, input Clk, output reg AluEnable, input [4:0] RT 
+	);
+	
+	reg [7:0] nextState, state;
+	
+	always @(posedge Clk) begin
+		
+		// if(RESET) begin
+		// $display("state = RESET");
+		// 	nextState = 8'b00000000; 
+		// 	end
+		//$display("PosEdge Clk changed \n");
+		//$display ("Clk: %d   state: %d   nextState: %d", Clk, state, nextState);
+		state = nextState; 
+			
+	end
+
+	
+	always @ (state, RESET) // based on state, generate signals
+		begin
+		// $display ("Clk: %d   state: %d   nextState: %d reset: %d", Clk, state, nextState, RESET);
+		// $display("OpCode: %b   functCode: %b", OpCode, functCode);	
+			if(RESET) begin
+			//$display("state = RESET");
+			nextState = 8'b00000000; 
+			end
+			//$display("Entered state selection");
+			//$display("Opcode: %b 		Function code: %b        state = %b", OpCode, functCode,state);
+			case (state)
+				8'd0: begin // RESET state
+				 $display("Entered RESET state \n");
+				 	Branch = 0;
+					RegWrite = 0;
+					ClrNPC = 1;
+					ClrPC = 1;
+					IR_Enable = 0;
+					PC_Enable = 0; // si NPC cambia a 0, PC se deberia prender
+					 nextState = 8'd1;
+					
+					
+				end
+				8'd1: begin // FETCH state
+				$display("\nEntered FETCH state");
+				//$display("OpCode: %b   functCode: %b", OpCode, functCode);	
+					//Branch = 0;
+					AluEnable = 0;
+					RegWrite = 0;
+					MemRead = 0;
+					RegDst = 0;
+					ClrNPC = 0;
+					ClrPC = 0;
+					
+					IR_Enable = 1;
+					PC_Enable = 1; 
+					isJump = 0;
+					//ClrPC = 0;
+					//Branch = 0;
+					nextState = 8'd2; 
+				end
+				8'd2: begin // decode state
+				//$display("Entered DECODE state");
+					//IR_Enable = 1;
+					//$display("OpCode inside DECODE: %b", OpCode);
+					case (OpCode)
+			6'b000000: begin // arithmetical or special 
+					if (functCode == 6'b100000) begin //add
+						nextState <= 8'd3;
+					end
+					else if(functCode == 6'b100001) begin // addu
+						nextState <= 8'd4;
+					end
+					else if (functCode == 6'b100010) begin // sub
+						nextState <= 8'd5;
+					end
+					else if (functCode ==  6'b100011) begin // subu
+						nextState <= 8'd6;
+					end
+					else if (functCode ==  6'b101010) begin // SLT
+						nextState <= 8'd9;
+					end
+					else if (functCode == 6'b101011) begin // SLTU
+						nextState <= 8'd10;
+					end
+					else if (functCode == 6'b011010) begin // div
+					
+					end
+					else if (functCode == 6'b011011) begin // divu
+					
+					end
+					else if (functCode == 6'b011000) begin // mult
+					
+					end
+					else if (functCode == 6'b011001) begin // multu
+						nextState <= 8'd80; // test 2
+					
+					end
+					else if (functCode == 6'b100100) begin // and
+						nextState <= 8'd19;
+					end
+					else if (functCode == 6'b100101) begin // or
+						nextState <= 8'd21;
+					end
+					else if (functCode == 6'b100110) begin // xor
+						nextState <= 8'd23;
+					end
+					else if (functCode == 6'b100111) begin // nor
+						nextState <= 8'd25;
+					end
+					else if (functCode == 6'b000000) begin // sll
+						nextState <= 8'd27;
+					end
+					else if (functCode == 6'b000100) begin // sllv
+						nextState <= 8'd28;
+					end
+					else if (functCode == 6'b000011) begin // sra
+						nextState <= 8'd29;
+					end
+					else if (functCode == 6'b000111) begin // srav
+						nextState <= 8'd30;
+					end
+					else if ( functCode == 6'b000010) begin // srl
+						nextState <= 8'd31;
+					end
+					else if ( functCode == 6'b000110) begin // srlv
+						nextState <= 8'd32;
+					end
+					else if (functCode == 6'b010000) begin // MFhi
+						nextState <= 8'd81; // test 2
+					end
+					else if (functCode == 6'b010010) begin // mflo
+						nextState <= 8'd82; //test 2
+					end
+					else if (functCode == 6'b001011) begin // movn
+					
+					end
+					else if (functCode == 6'b001010) begin // movz
+					
+					end
+					else if (functCode == 6'b010001) begin // mthi
+						nextState <= 8'd83; //mthi
+					end
+					else if (functCode == 6'b010011) begin // mtlo
+						nextState <= 8'd84; //test 2
+					end
+					else if (functCode == 6'b001001) begin // jalr
+					
+					end
+					else if (functCode == 6'b001000) begin // jr
+						nextState <= 8'd85; //test2
+					end
+					
+				end
+			6'b001000: begin //addi
+				//$display("Defined Next State: 7 ADDI");
+				nextState <= 8'd7;
+			end
+			6'b001001: begin //addiu
+				nextState <= 8'd8;
+			end
+			6'b001010: begin //slti
+				nextState <= 8'd11;
+			end
+			6'b001011: begin //sltiu
+				nextState <= 8'd12;
+			end
+			6'b011100: begin //CLO or CLZ
+				
+					if (functCode == 6'b100000) begin //CLZ
+					end
+					else if (functCode == 6'b100001) begin //CLO
+					end
+					else $display ("Illegal operation detected.");
+				
+			end
+			6'b001100: begin //andi
+				nextState <= 8'd20;
+			end
+			6'b001101: begin //ori
+				nextState <= 8'd22;
+			end
+			6'b001110: begin //xori
+				nextState <= 8'd24;
+			end
+			6'b001111: begin //lui
+				nextState <= 8'd26;
+			end
+			6'b100011: begin //LW
+				nextState <= 8'd33;
+			end
+			6'b100001: begin //LH
+				nextState <= 8'd34;
+			end
+			6'b100101: begin //LHU
+				nextState <= 8'd35;
+			end
+			6'b100000: begin //LB
+				nextState <= 8'd36;
+			end
+			6'b100100: begin //LBU
+				nextState <= 8'd37;
+			end
+			6'b101011: begin //SW
+				nextState <= 8'd38;
+			end
+			6'b101001: begin //SH
+				nextState <= 8'd39;
+			end
+			6'b101000: begin //SB
+				nextState <= 8'd40;
+			end
+			6'b000100: begin // BEQ
+				nextState <= 8'd47;
+				//$display("BEQ State");
+			end
+			6'b000001: begin // BAL
+				nextState <= 8'd48;
+			end
+			6'b000001: begin // BGEZ or BGEZAL or BLTZ or BLTZAL
+				if(RT == 5'b00001) begin
+					nextState <= 8'd51; //BGEZ
+				end
+				else if (RT == 5'b10001) begin
+					nextState <= 8'd57; // BGEZAL
+				end
+				else if (RT == 5'b00000) begin // BLTZ
+					nextState <= 8'd56;
+				end
+				else if (RT == 5'b10000) begin // BLTZAL
+					nextState <= 8'd58;
+				end
+				else begin
+					$display("Illegal operation selected: Bye");
+					nextState <= 8'd0;
+				end
+			end
+			6'b000111: begin //BGTZ
+				nextState <= 8'd54;
+				//$display("BGTZ state");
+			end
+			6'b000100: begin //BLEZ 
+				nextState <= 8'd55;
+			end
+			6'b000101: begin // BNE
+				nextState <= 8'd59;
+			end
+	endcase	
+				end
+				8'd3: begin // add state
+				$display ("ADD State");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd0;
+					MemWrite = 0;
+					ALUSrc = 1;
+				//	MUX_A_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+
+					if(Overflow) begin
+						$display ("Overflow detected: It's a TRAP!");
+
+					end
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd4: begin // addu state
+				$display ("ADDU State");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd1;
+					MemWrite = 0;
+					ALUSrc = 1;
+				//	MUX_A_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd5: begin // sub state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+				//	MUX_A_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd6: begin // subu state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd3;
+					MemWrite = 0;
+					ALUSrc = 1;
+				//	MUX_A_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd7: begin // addi state
+				 	$display ("ADDI State");
+					Branch = 0;
+					RegDst = 0;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd4;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1;
+					
+					AluEnable = #1 1;
+					
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					//$display("Branch = %d  RegDst = %d   RegWrite = %d ClrNPC = %d", Branch, RegDst, RegWrite, ClrNPC);
+					//$display("MemRead = %d MemtoReg = %d   ALUOp = %d   MemWrite = %d", MemRead, MemtoReg, ALUOp, MemWrite);
+					//$display("ALUSrc = %d  MUX_A_Sel = %d   IR_Enable = %d  isSigned = %d", ALUSrc, MUX_A_Sel, IR_Enable, isSigned);
+					//$display("PC_Enable = %d  isJump = %d   ClrPC = %d", PC_Enable, isJump, ClrPC);
+					nextState = 8'd1; 
+					$display("nextState = %d", nextState);
+								
+				end
+				8'd8: begin // addiu state
+					$display("ADDIU State");
+					Branch = 0;
+					RegDst = 0;
+					
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd5;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable = #1 1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					RegWrite = 1;
+					nextState = 8'd1; 
+								
+				end
+				8'd9: begin // slt state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd6;
+					MemWrite = 0;
+					ALUSrc = 1;
+					//MUX_A_Sel = 2'd1; Dont cares
+					//MUX_B_Sel = 2'd1; Dont cares
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd10: begin // sltu state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd7; // hay q añadir aluop de esto al ALU 
+					MemWrite = 0;
+					ALUSrc = 1;
+					//MUX_A_Sel = 2'd1; Dont cares
+					//MUX_B_Sel = 2'd1; Dont cares
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd11: begin // slti state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd8; // hay q añadir aluop de esto al ALU 
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0; 
+					MUX_B_Sel = 2'd0; 
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable = #1 1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+				8'd12: begin // sltiu state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd9; // hay q añadir aluop de esto al ALU 
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd1; 
+					MUX_B_Sel = 2'd1; 
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable = #1 1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1; 
+								
+				end
+
+				8'd19: begin // and state
+				 $display("Entered AND state");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd12;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					//$display("Branch = %d  RegDst = %d   RegWrite = %d ClrNPC = %d", Branch, RegDst, RegWrite, ClrNPC);
+					//$display("MemRead = %d MemtoReg = %d   ALUOp = %d   MemWrite = %d", MemRead, MemtoReg, ALUOp, MemWrite);
+					//$display("ALUSrc = %d    IR_Enable = %d  isSigned = %d", ALUSrc,IR_Enable, isSigned);
+					//$display("PC_Enable = %d  isJump = %d   ClrPC = %d", PC_Enable, isJump, ClrPC);
+					nextState = 8'd1; 
+					$display("nextState = %d", nextState);
+				end
+				8'd20: begin // andi state
+					Branch = 0;
+					RegDst = 0;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd13;
+					MemWrite = 0;
+					ALUSrc = 1;
+					MUX_A_Sel = 2'd1; 
+					MUX_B_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable = #1  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd21: begin // or state
+				 #1 $display("Entered OR state");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd14;
+					MemWrite = 0;
+					ALUSrc = 1;
+				    //AluEnable =  1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					// $display("Branch = %d  RegDst = %d   RegWrite = %d ClrNPC = %d", Branch, RegDst, RegWrite, ClrNPC);
+					// $display("MemRead = %d MemtoReg = %d   ALUOp = %d   MemWrite = %d", MemRead, MemtoReg, ALUOp, MemWrite);
+					// $display("ALUSrc = %d    IR_Enable = %d  isSigned = %d", ALUSrc,IR_Enable, isSigned);
+					// $display("PC_Enable = %d  isJump = %d   ClrPC = %d", PC_Enable, isJump, ClrPC);
+					nextState = 8'd1; 
+					$display("nextState = %d", nextState);
+				end
+				8'd22: begin // ori state
+					Branch = 0;
+					RegDst = 0;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd15;
+					MemWrite = 0;
+					ALUSrc = 1;
+					MUX_A_Sel = 2'd1; 
+					MUX_B_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable = #1 1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd23: begin // xor state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd16;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd24: begin // xori state
+					Branch = 0;
+					RegDst = 0;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd17;
+					MemWrite = 0;
+					ALUSrc = 1;
+					MUX_A_Sel = 2'd1; 
+					MUX_B_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable = #1  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd25: begin // nor state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd18;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd26: begin // lui state
+					Branch = 0;
+					RegDst = 0;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd19;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd2; 
+					MUX_B_Sel = 2'd2;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable =  #1 1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd27: begin // sll state
+					$display("SLL State");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd20;
+					MemWrite <= 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					//isSigned = 0; don't care, I think
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd28: begin // sllv state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd21;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd29: begin // sra state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd13;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					//isSigned = 1; 
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd30: begin // srav state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd22;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd31: begin // srl state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd24;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					//isSigned = 1; 
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd32: begin // srlv state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd25;
+					MemWrite = 0;
+					ALUSrc = 1;
+				
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+				end
+				8'd33: begin  // LW state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 1;
+					MemtoReg = 2'd0;
+					ALUOp = 5'd1;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd2;
+					nextState = 8'd1;
+				end
+				8'd34: begin  // LH state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 1;
+					MemtoReg = 2'd0;
+					ALUOp = 5'd1;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd1;
+					nextState = 8'd1;
+				end
+				8'd35: begin  // LHU state
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 1;
+					MemtoReg = 2'd0;
+					ALUOp = 5'd1;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd1;
+					MUX_B_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0; 
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd1;
+					nextState = 8'd1;
+				end
+				8'd36: begin  // LB state
+				$display ("LB State");
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 1;
+					ClrNPC = 0;
+					MemRead = 1;
+					MemtoReg = 2'd0;
+					ALUOp = 5'd1;
+					MemWrite = 0;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1; 
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd0;
+					nextState = 8'd1;
+				end
+				8'd37: begin  // LBU state
+				$display ("LBU State");
+				
+					Branch <= 0;
+					
+					RegWrite <= 1;
+					RegDst <= 1;
+					MemRead <=  1;
+					ClrNPC <= 0;
+					
+					
+					ALUOp <=  5'd1;
+					MemWrite <= 0;
+					ALUSrc <= 0;
+					MUX_A_Sel <= 2'd1;
+					MUX_B_Sel <= 2'd1;
+					IR_Enable <= 0;
+					isSigned <= 0; 
+					AluEnable <= 1;
+
+					PC_Enable <= 0;
+					isJump <= 0;
+					ClrPC <= 0;
+					ramType <= 2'd0;
+					MemtoReg <= 2'd0;
+					
+					nextState =  8'd1;
+
+				end
+				8'd38: begin // SW state
+					Branch = 0;
+					//RegDst = don't care
+					RegWrite = 0;
+					MemRead = 0;
+					//MemtoReg = don't care
+					ALUOp = 5'd1;
+					MemWrite = 1;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd2;
+					nextState = 8'd1;
+				end
+				8'd39: begin // SH state
+					Branch = 0;
+					//RegDst = don't care
+					RegWrite = 0;
+					MemRead = 0;
+					//MemtoReg = don't care
+					ALUOp = 5'd1;
+					MemWrite = 1;
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd1;
+					nextState = 8'd1;
+				end
+				8'd40: begin // SB state
+					$display("SB State");
+					Branch = 0;
+					//RegDst = don't care
+					RegWrite = 0;
+					MemRead = 0;
+					//MemtoReg = don't care
+					ALUOp = 5'd1;
+					
+					ALUSrc = 0;
+					MUX_A_Sel = 2'd0;
+					MUX_B_Sel = 2'd0;
+					IR_Enable = 0;
+					isSigned = 1;
+					AluEnable = #1 1;
+					MemWrite =  1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					ramType = 2'd0;
+					nextState = 8'd1;
+				end
+				8'd47: begin // BEQ and B (special case of BEQ)
+					$display("BEQ State");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					MUX_A_Sel =0;
+					AluEnable = 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+
+					#1 
+					if(Zero)begin
+						//$display("Inside conditional Zero = %d", Zero);
+						Branch = 1;
+					end
+
+					nextState = 8'd1;
+
+				end
+				8'd57: begin //BGEZAL
+					RegDst = 1; // va a tratar escribir en r0, no va a funcionar
+					RegWrite = 1; // si regDst funcionase, regwrite escribiria PC + 8 en reg file para luego ejecutar el branch.
+
+					nextState = 8'd51; // ejecuta BGEZAL
+				end
+				8'd58: begin //BLTZAL
+					RegDst = 1; // va a tratar escribir en r0, no va a funcionar
+					RegWrite = 1; // si regDst funcionase, regwrite escribiria PC + 8 en reg file para luego ejecutar el branch.
+
+					nextState = 8'd56; // ejecuta BLTZ
+				end
+				8'd51: begin // BGEZ
+				$display("BGEZ");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					
+					#1 //$display("Conditional Statement outside ");
+					if(!(Neg ^ Overflow))begin
+						Branch = 1;
+						//$display("Conditional Statement inside: Branch jump should occur.");
+					end
+					nextState = 8'd1;
+
+				end
+				8'd54: begin // BGTZ
+					$display("BGTZ State");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					#1 //$display("Conditional Sta`tement outside ");
+					//$display("Zero: %d Neg: %d Overflow: %d", Zero, Neg, Overflow );
+					if(~(Zero || (Neg ^ Overflow)))begin
+						//$display("BGTZ Jump");
+						Branch = 1;
+						//$display("Conditional Statement inside: Branch jump should occur.");
+					end
+					nextState = 8'd1;
+
+				end
+				8'd55: begin // BLEZ
+					$display("BLEZ");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					
+					#1 //$display("Conditional Statement outside ");
+					if(Zero || (Neg ^ Overflow)) begin
+						Branch = 1;
+						//$display("Conditional Statement inside: Branch jump should occur.");
+					end
+					nextState = 8'd1;
+
+				end
+				8'd56: begin // BLTZ
+					$display("BLTZ");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					
+					#1// $display("Conditional Statement outside ");
+					if(Neg ^ Overflow)begin
+						Branch = 1;
+						//$display("Conditional Statement inside: Branch jump should occur.");
+					end
+					nextState = 8'd1;
+
+				end
+				8'd59: begin // BNE
+					$display("BNE");
+					RegDst = 1;
+					RegWrite = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd2;
+					MemWrite = 0;
+					ALUSrc = 1;
+					IR_Enable = 0; 
+					isSigned =1;
+					AluEnable = #1 1;
+					PC_Enable = 0;
+					isJump = 0;
+					ClrPC = 0;
+					
+					#1 //$display("Conditional Statement outside ");
+					if(!Zero)begin
+						Branch = 1;
+						//$display("Conditional Statement inside: Branch jump should occur.");
+					end
+					nextState = 8'd1;
+
+				end
+				8'd80: begin //multu
+					Branch = 0;
+					RegDst = 1;
+					RegWrite = 0;
+					ClrNPC = 0;
+					MemRead = 0;
+					MemtoReg = 2'd1;
+					ALUOp = 5'd26; //no esta implementada, ira a default. y no hara nada
+					MemWrite = 0;
+					ALUSrc = 1;
+				//	MUX_A_Sel = 2'd1;
+					IR_Enable = 0;
+					isSigned = 0;
+					AluEnable =  1;
+					PC_Enable = 0; 
+					isJump = 0;
+					ClrPC = 0;
+					
+					nextState = 8'd1;
+					
+				end
+				8'd81: begin // mfhi
+					
+				end
+				8'd82: begin // mflo
+					
+				end
+				8'd83: begin // mthi
+					
+				end
+				8'd84: begin //mtlo
+					
+				end
+				8'd85: begin // jr
+					
+				end
+			endcase
+		end
+endmodule
